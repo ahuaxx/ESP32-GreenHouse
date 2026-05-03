@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "drivers/i2c_bus.c"
+        "drivers/bme680_sensor.c"
+        "drivers/tmg39931_sensor.c"
+        "tasks/sensor_task.c"
+    INCLUDE_DIRS
+        "."
+        "common"
+        "drivers"
+        "tasks"
+)
