@@ -4,10 +4,16 @@ idf_component_register(
         "drivers/i2c_bus.c"
         "drivers/bme680_sensor.c"
         "drivers/tmg39931_sensor.c"
+        "drivers/oled_display.c"
         "tasks/sensor_task.c"
+        "tasks/display_task.c"
+        "services/sensor_service.c"
+        "include/sensor_data.c"
     INCLUDE_DIRS
         "."
+        "include"
         "common"
         "drivers"
         "tasks"
+        "services"
 )

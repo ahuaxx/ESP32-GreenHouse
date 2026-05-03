@@ -5,6 +5,7 @@
 
 #include "bme680_sensor.h"
 #include "tmg39931_sensor.h"
+#include "sensor_service.h"
 
 #include "esp_log.h"
 
@@ -39,6 +40,8 @@ static void sensor_task(void *arg)
 
         if (bme680_sensor_read(&bme680, &bme_data) == ESP_OK)
         {
+            ESP_ERROR_CHECK(sensor_service_update_bme680(&bme_data));
+
             ESP_LOGI("BME680", "Temperature: %.2f °C", bme_data.temperature);
             ESP_LOGI("BME680", "Humidity: %.2f %%", bme_data.humidity);
             ESP_LOGI("BME680", "Pressure: %.2f hPa", bme_data.pressure_hpa);
@@ -47,6 +50,8 @@ static void sensor_task(void *arg)
 
         if (tmg39931_sensor_read(&light_sensor, &light_data) == ESP_OK)
         {
+            ESP_ERROR_CHECK(sensor_service_update_light(&light_data));
+
             ESP_LOGI(
                 "TMG39931",
                 "Clear: %u | R: %u | G: %u | B: %u",

@@ -8,6 +8,9 @@
 #include "esp_rom_sys.h"
 #include "esp_check.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "bme68x_defs.h"
 
 static const char *TAG = "BME680";
@@ -135,6 +138,7 @@ esp_err_t bme680_sensor_read(
     }
 
     int8_t rslt = bme68x_set_op_mode(BME68X_FORCED_MODE, &sensor->dev);
+
     if (rslt != BME68X_OK)
     {
         ESP_LOGE(TAG, "bme68x_set_op_mode failed: %d", rslt);
@@ -148,25 +152,54 @@ esp_err_t bme680_sensor_read(
 
     sensor->dev.delay_us(delay_us, sensor->dev.intf_ptr);
 
+    /*
+     * Le chauffage gaz ajoute du temps.
+     * heatr_dur = 100 ms dans init(), donc on attend large.
+     */
+    vTaskDelay(pdMS_TO_TICKS(150));
+
     struct bme68x_data data;
     uint8_t n_fields = 0;
 
-    rslt = bme68x_get_data(
-        BME68X_FORCED_MODE,
-        &data,
-        &n_fields,
-        &sensor->dev);
-
-    if (rslt != BME68X_OK || n_fields == 0)
+    for (int attempt = 0; attempt < 5; attempt++)
     {
-        ESP_LOGW(TAG, "No data: rslt=%d n_fields=%d", rslt, n_fields);
-        return ESP_FAIL;
+        memset(&data, 0, sizeof(data));
+        n_fields = 0;
+
+        rslt = bme68x_get_data(
+            BME68X_FORCED_MODE,
+            &data,
+            &n_fields,
+            &sensor->dev);
+
+        if (rslt == BME68X_OK && n_fields > 0)
+        {
+            measurement->temperature = data.temperature;
+            measurement->humidity = data.humidity;
+            measurement->pressure_hpa = data.pressure / 100.0f;
+            measurement->gas_resistance = data.gas_resistance;
+
+            ESP_LOGI(
+                TAG,
+                "T=%.2fC H=%.2f%% P=%.2fhPa Gas=%.2f",
+                measurement->temperature,
+                measurement->humidity,
+                measurement->pressure_hpa,
+                measurement->gas_resistance);
+
+            return ESP_OK;
+        }
+
+        ESP_LOGW(
+            TAG,
+            "BME680 data not ready attempt %d: rslt=%d n_fields=%d",
+            attempt + 1,
+            rslt,
+            n_fields);
+
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
-    measurement->temperature = data.temperature;
-    measurement->humidity = data.humidity;
-    measurement->pressure_hpa = data.pressure / 100.0f;
-    measurement->gas_resistance = data.gas_resistance;
-
-    return ESP_OK;
+    ESP_LOGW(TAG, "No BME680 data after retries");
+    return ESP_FAIL;
 }
