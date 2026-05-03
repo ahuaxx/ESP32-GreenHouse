@@ -1,85 +1,77 @@
 #include "display_task.h"
 
-#include <stdio.h>
-
 #include "esp_log.h"
-#include "esp_err.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "oled_display.h"
 #include "sensor_data.h"
+#include "oled_display.h"
+#include "power_task.h"
+#include "web_server.h"
 
 static const char *TAG = "DISPLAY_TASK";
 
-static QueueHandle_t s_display_queue = NULL;
+typedef struct
+{
+    QueueHandle_t queue;
+    EventGroupHandle_t event_group;
+} display_task_ctx_t;
+
+static display_task_ctx_t s_display_ctx = {0};
 
 static void display_task(void *arg)
 {
-    (void)arg;
+    display_task_ctx_t *ctx = (display_task_ctx_t *)arg;
 
-    ESP_LOGI(TAG, "Starting display task");
+    if (ctx == NULL || ctx->queue == NULL || ctx->event_group == NULL)
+    {
+        ESP_LOGE(TAG, "Invalid display task context");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    sensor_data_t data;
+
+    ESP_LOGI(TAG, "Display task started");
 
     ESP_ERROR_CHECK(oled_display_init());
 
-    sensor_data_t data;
-    char line1[32];
-    char line2[32];
-    char line3[32];
-    char line4[32];
-
     while (1)
     {
-        if (xQueueReceive(s_display_queue, &data, portMAX_DELAY) == pdTRUE)
+        if (xQueueReceive(ctx->queue, &data, portMAX_DELAY) == pdTRUE)
         {
-            snprintf(line1, sizeof(line1), "T: %.1fC H: %.0f%%",
-                     data.temperature_c,
-                     data.humidity_pct);
+            ESP_LOGI(TAG, "Sensor data received");
 
-            snprintf(line2, sizeof(line2), "P: %.1fhPa",
-                     data.pressure_hpa);
+            ESP_ERROR_CHECK(web_server_update_data(&data));
 
-            snprintf(line3, sizeof(line3), "Gas: %.1fk",
-                     data.gas_kohms);
+            ESP_ERROR_CHECK(oled_display_show_measurements(&data));
 
-            snprintf(line4, sizeof(line4), "Light: %u",
-                     data.light_lux);
+            xEventGroupSetBits(ctx->event_group, APP_EVENT_DISPLAY_DONE);
 
-            oled_display_clear();
-            oled_display_draw_text(0, 0, line1);
-            oled_display_draw_text(0, 16, line2);
-            oled_display_draw_text(0, 32, line3);
-            oled_display_draw_text(0, 48, line4);
-            oled_display_update();
-
-            ESP_LOGI(TAG, "Display updated");
+            vTaskDelay(pdMS_TO_TICKS(200));
         }
     }
 }
 
-esp_err_t display_task_start(QueueHandle_t display_queue)
+esp_err_t display_task_start(QueueHandle_t display_queue, EventGroupHandle_t event_group)
 {
-    if (display_queue == NULL)
+    if (display_queue == NULL || event_group == NULL)
     {
+        ESP_LOGE(TAG, "Invalid arguments");
         return ESP_ERR_INVALID_ARG;
     }
 
-    s_display_queue = display_queue;
+    s_display_ctx.queue = display_queue;
+    s_display_ctx.event_group = event_group;
 
     BaseType_t ret = xTaskCreate(
         display_task,
         "display_task",
         4096,
-        NULL,
-        4,
+        &s_display_ctx,
+        5,
         NULL);
 
-    if (ret != pdPASS)
-    {
-        ESP_LOGE(TAG, "Failed to create display task");
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
+    return ret == pdPASS ? ESP_OK : ESP_FAIL;
 }

@@ -112,14 +112,18 @@ static esp_err_t oled_reset_gpio(void)
 
     ESP_RETURN_ON_ERROR(gpio_config(&io_conf), TAG, "Failed to config OLED reset GPIO");
 
-    gpio_set_level(OLED_RST_GPIO, 0);
-    vTaskDelay(pdMS_TO_TICKS(20));
-
     gpio_set_level(OLED_RST_GPIO, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
 
+    gpio_set_level(OLED_RST_GPIO, 0);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    gpio_set_level(OLED_RST_GPIO, 1);
+    vTaskDelay(pdMS_TO_TICKS(200));
+
     return ESP_OK;
 }
+
 
 static void oled_set_pixel(int x, int y, bool on)
 {
@@ -165,6 +169,9 @@ static void oled_draw_char(int x, int y, char c)
 esp_err_t oled_display_init(void)
 {
     ESP_RETURN_ON_ERROR(oled_reset_gpio(), TAG, "OLED hardware reset failed");
+
+    vTaskDelay(pdMS_TO_TICKS(200));
+    memset(oled_buffer, 0x00, sizeof(oled_buffer));
 
     i2c_master_bus_config_t bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
@@ -358,4 +365,70 @@ esp_err_t oled_display_show_measurements(const sensor_data_t *data)
     }
 
     return oled_display_show_text(line1, line2, line3);
+}
+
+esp_err_t oled_display_sleep(void)
+{
+    if (oled_panel == NULL)
+    {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_lcd_panel_disp_on_off(oled_panel, false);
+
+    return ESP_OK;
+}
+esp_err_t oled_display_shutdown(void)
+{
+    esp_err_t ret = ESP_OK;
+
+    if (oled_panel != NULL)
+    {
+        memset(oled_buffer, 0x00, sizeof(oled_buffer));
+
+        ret = esp_lcd_panel_draw_bitmap(
+            oled_panel,
+            0,
+            0,
+            OLED_WIDTH,
+            OLED_HEIGHT,
+            oled_buffer);
+
+        if (ret != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Failed to clear OLED before shutdown: %s", esp_err_to_name(ret));
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        ret = esp_lcd_panel_disp_on_off(oled_panel, false);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Failed to turn OLED off: %s", esp_err_to_name(ret));
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        esp_lcd_panel_del(oled_panel);
+        oled_panel = NULL;
+    }
+
+    if (oled_io != NULL)
+    {
+        esp_lcd_panel_io_del(oled_io);
+        oled_io = NULL;
+    }
+
+    if (oled_bus != NULL)
+    {
+        i2c_del_master_bus(oled_bus);
+        oled_bus = NULL;
+    }
+
+    gpio_set_level(OLED_RST_GPIO, 1);
+    vTaskDelay(pdMS_TO_TICKS(50));
+
+    ESP_LOGI(TAG, "OLED shutdown complete");
+
+    return ESP_OK;
 }

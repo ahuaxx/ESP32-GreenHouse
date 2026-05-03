@@ -13,4 +13,7 @@ esp_err_t oled_display_show_text(const char *line1, const char *line2, const cha
 esp_err_t oled_display_show_status(const char *title, const char *status, const char *detail);
 esp_err_t oled_display_show_measurements(const sensor_data_t *data);
 
-#endif
+esp_err_t oled_display_sleep(void);
+esp_err_t oled_display_shutdown(void);
+
+#endif // OLED_DISPLAY_H

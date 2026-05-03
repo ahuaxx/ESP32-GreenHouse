@@ -4,15 +4,11 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-esp_err_t display_task_start(QueueHandle_t display_queue);
-
-#ifdef __cplusplus
-}
-#endif
+esp_err_t display_task_start(
+    QueueHandle_t display_queue,
+    EventGroupHandle_t event_group
+);
 
 #endif

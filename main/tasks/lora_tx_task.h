@@ -4,17 +4,11 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/event_groups.h"
 
-#include "sensor_data.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-esp_err_t lora_tx_task_start(QueueHandle_t sensor_data_queue);
-
-#ifdef __cplusplus
-}
-#endif
+esp_err_t lora_tx_task_start(
+    QueueHandle_t lora_queue,
+    EventGroupHandle_t event_group
+);
 
 #endif

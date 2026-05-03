@@ -1,6 +1,8 @@
 idf_component_register(
     SRCS
         "main.c"
+        "services/power_service.c"
+        "tasks/power_task.c"
         "drivers/i2c_bus.c"
         "drivers/bme680_sensor.c"
         "drivers/tmg39931_sensor.c"
@@ -11,6 +13,8 @@ idf_component_register(
         "tasks/sensor_task.c"
         "tasks/display_task.c"
         "tasks/lora_tx_task.c"
+        "services/web_server.c"
+        "services/wifi.c"
 
     INCLUDE_DIRS
         "."
@@ -20,6 +24,9 @@ idf_component_register(
         "tasks"
 
     REQUIRES
+        esp_http_server
+        esp_wifi
+        nvs_flash
         driver
         esp_driver_i2c
         esp_lcd

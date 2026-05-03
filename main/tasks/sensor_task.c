@@ -18,6 +18,7 @@ static const char *TAG = "SENSOR_TASK";
 
 static QueueHandle_t s_display_queue = NULL;
 static QueueHandle_t s_lora_queue = NULL;
+static sensor_data_t s_last_sensor_data = {0};
 
 typedef struct
 {
@@ -60,13 +61,19 @@ static void sensor_task(void *arg)
             sensor_data.pressure_hpa = bme_data.pressure_hpa;
             sensor_data.gas_kohms = bme_data.gas_resistance / 1000.0f;
             sensor_data.bme680_ok = true;
-            sensor_data.light_lux = light_data.clear;
-            sensor_data.light_ok = true;
 
             ESP_LOGI("BME680", "Temperature: %.2f °C", bme_data.temperature);
             ESP_LOGI("BME680", "Humidity: %.2f %%", bme_data.humidity);
             ESP_LOGI("BME680", "Pressure: %.2f hPa", bme_data.pressure_hpa);
             ESP_LOGI("BME680", "Gas resistance: %.2f Ohm", bme_data.gas_resistance);
+        }
+        else
+        {
+            sensor_data.temperature_c = s_last_sensor_data.temperature_c;
+            sensor_data.humidity_pct = s_last_sensor_data.humidity_pct;
+            sensor_data.pressure_hpa = s_last_sensor_data.pressure_hpa;
+            sensor_data.gas_kohms = s_last_sensor_data.gas_kohms;
+            sensor_data.bme680_ok = false;
         }
 
         if (tmg39931_sensor_read(&light_sensor, &light_data) == ESP_OK)
@@ -74,6 +81,7 @@ static void sensor_task(void *arg)
             ESP_ERROR_CHECK(sensor_service_update_light(&light_data));
 
             sensor_data.light_lux = light_data.clear;
+            sensor_data.light_ok = true;
 
             ESP_LOGI(
                 "TMG39931",
@@ -83,6 +91,13 @@ static void sensor_task(void *arg)
                 light_data.green,
                 light_data.blue);
         }
+        else
+        {
+            sensor_data.light_lux = s_last_sensor_data.light_lux;
+            sensor_data.light_ok = false;
+        }
+
+        s_last_sensor_data = sensor_data;
 
         xQueueOverwrite(s_display_queue, &sensor_data);
         xQueueOverwrite(s_lora_queue, &sensor_data);
