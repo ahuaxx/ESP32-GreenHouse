@@ -6,13 +6,18 @@
 #include "bme680_sensor.h"
 #include "tmg39931_sensor.h"
 #include "sensor_service.h"
+#include "sensor_data.h"
 
 #include "esp_log.h"
+#include "esp_err.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 static const char *TAG = "SENSOR_TASK";
+
+static QueueHandle_t s_display_queue = NULL;
+static QueueHandle_t s_lora_queue = NULL;
 
 typedef struct
 {
@@ -25,6 +30,13 @@ static void sensor_task(void *arg)
 {
     sensor_task_context_t *ctx = (sensor_task_context_t *)arg;
 
+    if (ctx == NULL || ctx->bus_handle == NULL)
+    {
+        ESP_LOGE(TAG, "Invalid sensor task context");
+        vTaskDelete(NULL);
+        return;
+    }
+
     bme680_sensor_t bme680;
     tmg39931_sensor_t light_sensor;
 
@@ -35,12 +47,21 @@ static void sensor_task(void *arg)
 
     while (1)
     {
-        bme680_measurement_t bme_data;
-        tmg39931_measurement_t light_data;
+        bme680_measurement_t bme_data = {0};
+        tmg39931_measurement_t light_data = {0};
+        sensor_data_t sensor_data = {0};
 
         if (bme680_sensor_read(&bme680, &bme_data) == ESP_OK)
         {
             ESP_ERROR_CHECK(sensor_service_update_bme680(&bme_data));
+
+            sensor_data.temperature_c = bme_data.temperature;
+            sensor_data.humidity_pct = bme_data.humidity;
+            sensor_data.pressure_hpa = bme_data.pressure_hpa;
+            sensor_data.gas_kohms = bme_data.gas_resistance / 1000.0f;
+            sensor_data.bme680_ok = true;
+            sensor_data.light_lux = light_data.clear;
+            sensor_data.light_ok = true;
 
             ESP_LOGI("BME680", "Temperature: %.2f °C", bme_data.temperature);
             ESP_LOGI("BME680", "Humidity: %.2f %%", bme_data.humidity);
@@ -52,6 +73,8 @@ static void sensor_task(void *arg)
         {
             ESP_ERROR_CHECK(sensor_service_update_light(&light_data));
 
+            sensor_data.light_lux = light_data.clear;
+
             ESP_LOGI(
                 "TMG39931",
                 "Clear: %u | R: %u | G: %u | B: %u",
@@ -61,21 +84,34 @@ static void sensor_task(void *arg)
                 light_data.blue);
         }
 
+        xQueueOverwrite(s_display_queue, &sensor_data);
+        xQueueOverwrite(s_lora_queue, &sensor_data);
+
         vTaskDelay(pdMS_TO_TICKS(SENSOR_READ_PERIOD_MS));
     }
 }
 
-void sensor_task_start(i2c_master_bus_handle_t bus_handle)
+esp_err_t sensor_task_start(
+    i2c_master_bus_handle_t bus_handle,
+    QueueHandle_t display_queue,
+    QueueHandle_t lora_queue)
 {
+    if (bus_handle == NULL || display_queue == NULL || lora_queue == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     sensor_task_ctx.bus_handle = bus_handle;
+    s_display_queue = display_queue;
+    s_lora_queue = lora_queue;
 
-    ESP_LOGI(TAG, "Starting sensor task");
-
-    xTaskCreate(
+    BaseType_t ret = xTaskCreate(
         sensor_task,
         "sensor_task",
-        SENSOR_TASK_STACK_SIZE,
+        4096,
         &sensor_task_ctx,
-        SENSOR_TASK_PRIORITY,
+        5,
         NULL);
+
+    return (ret == pdPASS) ? ESP_OK : ESP_FAIL;
 }

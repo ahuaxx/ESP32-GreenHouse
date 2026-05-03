@@ -5,15 +5,23 @@ idf_component_register(
         "drivers/bme680_sensor.c"
         "drivers/tmg39931_sensor.c"
         "drivers/oled_display.c"
+        "drivers/lora_radio.c"
+        "include/sensor_data.c"
+        "services/sensor_service.c"
         "tasks/sensor_task.c"
         "tasks/display_task.c"
-        "services/sensor_service.c"
-        "include/sensor_data.c"
+        "tasks/lora_tx_task.c"
+
     INCLUDE_DIRS
         "."
         "include"
-        "common"
         "drivers"
-        "tasks"
         "services"
+        "tasks"
+
+    REQUIRES
+        driver
+        esp_driver_i2c
+        esp_lcd
+        bme68x
 )
