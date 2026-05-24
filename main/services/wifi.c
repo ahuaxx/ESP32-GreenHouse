@@ -8,8 +8,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 
-#define WIFI_SSID "Axoul"
-#define WIFI_PASS "Axoul123"
+#define WIFI_SSID "ssid"
+#define WIFI_PASS "password"
 
 #define WIFI_CONNECTED_BIT BIT0
 

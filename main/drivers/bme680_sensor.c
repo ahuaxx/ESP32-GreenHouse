@@ -151,11 +151,7 @@ esp_err_t bme680_sensor_read(
         &sensor->dev);
 
     sensor->dev.delay_us(delay_us, sensor->dev.intf_ptr);
-
-    /*
-     * Le chauffage gaz ajoute du temps.
-     * heatr_dur = 100 ms dans init(), donc on attend large.
-     */
+    
     vTaskDelay(pdMS_TO_TICKS(150));
 
     struct bme68x_data data;

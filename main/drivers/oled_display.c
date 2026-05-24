@@ -378,6 +378,7 @@ esp_err_t oled_display_sleep(void)
 
     return ESP_OK;
 }
+
 esp_err_t oled_display_shutdown(void)
 {
     esp_err_t ret = ESP_OK;

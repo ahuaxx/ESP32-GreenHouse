@@ -33,7 +33,6 @@ static void power_task(void *arg)
 
     ESP_LOGI(TAG, "Display and LoRa done");
 
-    // ⬇️ Fenêtre serveur web active
     ESP_LOGI(TAG, "Web server active for %d seconds", APP_WEB_ACTIVE_TIME_SEC);
 
     vTaskDelay(pdMS_TO_TICKS(APP_WEB_ACTIVE_TIME_SEC * 1000));
